@@ -15,6 +15,22 @@ DROP TABLE IF EXISTS label;
 DROP TABLE IF EXISTS user;
 DROP TABLE IF EXISTS subscribition;
 DROP TABLE IF EXISTS genre;
+DROP TABLE IF EXISTS album_log;
+
+-- Drop triggers
+DROP TRIGGER IF EXISTS before_album_insert;
+DROP TRIGGER IF EXISTS before_genre_delete;
+DROP TRIGGER IF EXISTS block_genre_insert;
+DROP TRIGGER IF EXISTS restrict_genre_deletion;
+DROP TRIGGER IF EXISTS logging_on_album_insertion;
+
+-- Drop procedures
+DROP PROCEDURE IF EXISTS insert_into_table;
+DROP PROCEDURE IF EXISTS insert_compositor_album;
+DROP PROCEDURE IF EXISTS insert_noname;
+DROP PROCEDURE IF EXISTS column_aggregate_procedure;
+DROP PROCEDURE IF EXISTS split_table_dynamic;
+
 
 -- Create tables
 CREATE TABLE album (
@@ -165,7 +181,8 @@ END$$
 DELIMITER ;
 
 
--- Procedure to insert new values to a table
+-- TASK 2. PROCEDURES 
+-- a) Procedure to insert new values to a table
 DELIMITER $$
 CREATE PROCEDURE insert_into_table(
 	IN table_name VARCHAR(255),
@@ -204,36 +221,35 @@ DELIMITER ;
 
 -- Procedure insert 10 nonames
 DELIMITER $$
-CREATE PROCEDURE insert_noname()
+CREATE PROCEDURE insert_noname(IN table_name VARCHAR(255))
 BEGIN
     DECLARE i INT DEFAULT 1;
+
     WHILE i <= 10 DO
-        INSERT INTO genre (name) VALUES (CONCAT('Noname', i));
+        SET @sql = CONCAT('INSERT INTO ', table_name, ' (name) VALUES (''Noname', i, ''')');
+        SELECT @sql AS generated_sql; -- Optional: Debugging line to view generated SQL
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+
         SET i = i + 1;
     END WHILE;
 END$$
 DELIMITER ;
 
-
 -- Max/min/sum/avarage
 
 DELIMITER $$
-CREATE FUNCTION column_aggregate(table_name VARCHAR(50), column_name VARCHAR(50), operation VARCHAR(10))
-RETURNS FLOAT
+CREATE PROCEDURE column_aggregate_procedure(
+    IN table_name VARCHAR(50), 
+    IN column_name VARCHAR(50), 
+    IN operation VARCHAR(10)
+)
 BEGIN
-    SET @query = CONCAT('SELECT ', operation, '(', column_name, ') FROM ', table_name);
+    SET @query = CONCAT('SELECT ', operation, '(', column_name, ') AS result FROM ', table_name);
     PREPARE stmt FROM @query;
     EXECUTE stmt;
     DEALLOCATE PREPARE stmt;
-    RETURN 0; -- Реальний результат повертається при виконанні SELECT
-END$$
-DELIMITER ;
-
-DELIMITER $$
-CREATE PROCEDURE get_column_aggregate(IN table_name VARCHAR(50), IN column_name VARCHAR(50), IN operation VARCHAR(10))
-BEGIN
-    SET @result = column_aggregate(table_name, column_name, operation);
-    SELECT @result AS result;
 END$$
 DELIMITER ;
 
@@ -278,6 +294,8 @@ BEGIN
 END$$
 DELIMITER ;
 
+-- TRIGGERS. 1) Restrict any insertions on genre table
+
 DELIMITER $$
 CREATE TRIGGER block_genre_insert
 BEFORE INSERT ON genre
@@ -286,6 +304,46 @@ BEGIN
 	SIGNAL SQLSTATE "45000" SET MESSAGE_TEXT = 'Unable to insert to genre directly. Please disable block_genre_insert trigger and try again.';
 END$$
 DELIMITER ;
+
+
+-- 2) Restrict deletion in genre table
+DELIMITER $$
+CREATE TRIGGER restrict_genre_deletion
+BEFORE DELETE ON genre
+FOR EACH ROW
+BEGIN
+	SIGNAL SQLSTATE "45000" SET MESSAGE_TEXT = 'Unable to delete in genre. Please disable restrict_genre_deletion trigger and try again.';
+END $$
+DELIMITER ;
+
+-- 3) Logging on album update
+CREATE TABLE IF NOT EXISTS album_log (
+	id INT NOT NULL AUTO_INCREMENT,
+    action_time TIMESTAMP NOT NULL,
+    executed_action VARCHAR(255) NOT NULL,
+    PRIMARY KEY (id)
+);
+
+DELIMITER $$
+CREATE TRIGGER logging_on_album_insertion
+AFTER UPDATE ON album
+FOR EACH ROW
+BEGIN
+	DECLARE comment VARCHAR(255);
+    
+    SET comment = CONCAT("Changed name from ", OLD.name, " to ", NEW.name); 
+    
+    INSERT album_log(
+		executed_action
+    ) VALUES (
+        comment
+    );
+END $$
+DELIMITER ;
+
+
+
+
 
 
 
