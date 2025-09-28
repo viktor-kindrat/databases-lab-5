@@ -11,7 +11,6 @@ env:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
       packages: write
@@ -20,6 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # логін у GHCR (використовує PAT у GH secrets)
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -28,15 +28,18 @@ jobs:
           password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Build image
-        run: docker build -t $IMAGE_NAME:${IMAGE_TAG} .
+        run: docker build -t "$IMAGE_NAME:$IMAGE_TAG" .
 
       - name: Push image
-        run: docker push $IMAGE_NAME:${IMAGE_TAG}
+        run: docker push "$IMAGE_NAME:$IMAGE_TAG"
 
+      # ssh-keyscan потребує каталогу ~/.ssh
       - name: Add EC2 to known_hosts
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
 
       - name: Prepare SSH key
         run: |
@@ -45,6 +48,8 @@ jobs:
 
       - name: Deploy on EC2
         env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
           DB_HOST: ${{ secrets.DB_HOST }}
@@ -56,7 +61,8 @@ jobs:
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
         run: |
-          ssh -i ec2_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'bash -s' << 'EOF'
+          # важливо: весь user@host в лапках, і без 'EOF' (щоб змінні підставилися тут)
+          ssh -i ec2_key "${EC2_USER}@${EC2_HOST}" 'bash -s' << EOF
           set -e
 
           # --- docker & compose ---
@@ -78,10 +84,10 @@ jobs:
 
           # --- робоча папка + права ---
           sudo mkdir -p /opt/databases-lab-5
-          sudo chown -R $USER:$USER /opt/databases-lab-5
+          sudo chown -R \$USER:\$USER /opt/databases-lab-5
           cd /opt/databases-lab-5
 
-          # --- .env з секретів (значення підставляються тут, на раннері) ---
+          # --- .env (секрети з GH) ---
           cat > .env <<EENV
           DB_HOST=${DB_HOST}
           DB_PORT=${DB_PORT}
@@ -91,7 +97,7 @@ jobs:
           SECRET_KEY=${SECRET_KEY}
           EENV
 
-          # --- docker-compose.yml ---
+          # --- docker-compose.yml (створити або оновити image тег) ---
           if [ ! -f docker-compose.yml ]; then
             cat > docker-compose.yml <<DC
           services:
@@ -110,18 +116,16 @@ jobs:
                 start_period: 20s
           DC
           else
-            # оновимо тег образу в існуючому файлі
-            sed -i "s|^\(\s*image:\s*\).*|\1${IMAGE_NAME}:${IMAGE_TAG}|g" docker-compose.yml
+            sed -i "s|^\\(\\s*image:\\s*\\).*|\\1${IMAGE_NAME}:${IMAGE_TAG}|g" docker-compose.yml
           fi
 
-          # --- login + pull + restart (через sudo) ---
+          # --- login + pull + restart ---
           echo "${GHCR_TOKEN}" | sudo docker login ghcr.io -u "${GHCR_USER}" --password-stdin
-          sudo docker pull ${IMAGE_NAME}:${IMAGE_TAG}
+          sudo docker pull "${IMAGE_NAME}:${IMAGE_TAG}"
           sudo docker compose up -d
           sudo docker image prune -f
 
-          # швидкий healthcheck
+          # --- простий healthcheck ---
           sleep 2
           curl -fsS http://localhost:8080/healthz || true
           EOF
-      
