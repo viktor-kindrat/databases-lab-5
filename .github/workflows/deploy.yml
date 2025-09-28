@@ -67,22 +67,21 @@ jobs:
             else
               sudo dnf -y update || true
               sudo dnf -y install docker curl
-              # compose plugin на amazon linux 2023 може вже бути, якщо ні — встанови окремо
             fi
             sudo systemctl enable --now docker
-            sudo usermod -aG docker $USER || true
           fi
-          if ! docker compose version >/dev/null 2>&1; then
-            # на деяких образах потрібно встановити плагін
+          if ! sudo docker compose version >/dev/null 2>&1; then
             if command -v apt-get >/dev/null 2>&1; then
               sudo apt-get install -y docker-compose-plugin
             fi
           fi
 
-          mkdir -p /opt/databases-lab-5
+          # --- робоча папка + права ---
+          sudo mkdir -p /opt/databases-lab-5
+          sudo chown -R $USER:$USER /opt/databases-lab-5
           cd /opt/databases-lab-5
 
-          # --- .env з секретів ---
+          # --- .env з секретів (значення підставляються тут, на раннері) ---
           cat > .env <<EENV
           DB_HOST=${DB_HOST}
           DB_PORT=${DB_PORT}
@@ -94,7 +93,7 @@ jobs:
 
           # --- docker-compose.yml ---
           if [ ! -f docker-compose.yml ]; then
-            cat > docker-compose.yml <<'DC'
+            cat > docker-compose.yml <<DC
           services:
             web:
               image: ${IMAGE_NAME}:${IMAGE_TAG}
@@ -111,17 +110,18 @@ jobs:
                 start_period: 20s
           DC
           else
-            # оновити тег образу (залишаємо існуючу структуру файлу)
+            # оновимо тег образу в існуючому файлі
             sed -i "s|^\(\s*image:\s*\).*|\1${IMAGE_NAME}:${IMAGE_TAG}|g" docker-compose.yml
           fi
 
-          # --- login + pull + restart ---
-          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
-          docker pull ${IMAGE_NAME}:${IMAGE_TAG}
-          docker compose up -d
-          docker image prune -f
+          # --- login + pull + restart (через sudo) ---
+          echo "${GHCR_TOKEN}" | sudo docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+          sudo docker pull ${IMAGE_NAME}:${IMAGE_TAG}
+          sudo docker compose up -d
+          sudo docker image prune -f
 
-          # проста перевірка
+          # швидкий healthcheck
           sleep 2
           curl -fsS http://localhost:8080/healthz || true
           EOF
+      
