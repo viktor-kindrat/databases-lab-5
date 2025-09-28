@@ -19,7 +19,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # логін у GHCR (використовує PAT у GH secrets)
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -33,7 +32,6 @@ jobs:
       - name: Push image
         run: docker push "$IMAGE_NAME:$IMAGE_TAG"
 
-      # ssh-keyscan потребує каталогу ~/.ssh
       - name: Add EC2 to known_hosts
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
@@ -61,7 +59,6 @@ jobs:
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
         run: |
-          # важливо: весь user@host в лапках, і без 'EOF' (щоб змінні підставилися тут)
           ssh -i ec2_key "${EC2_USER}@${EC2_HOST}" 'bash -s' << EOF
           set -e
 
@@ -87,7 +84,7 @@ jobs:
           sudo chown -R \$USER:\$USER /opt/databases-lab-5
           cd /opt/databases-lab-5
 
-          # --- .env (секрети з GH) ---
+          # --- .env (секрети з GitHub) ---
           cat > .env <<EENV
           DB_HOST=${DB_HOST}
           DB_PORT=${DB_PORT}
@@ -97,7 +94,7 @@ jobs:
           SECRET_KEY=${SECRET_KEY}
           EENV
 
-          # --- docker-compose.yml (створити або оновити image тег) ---
+          # --- docker-compose.yml (створити або оновити) ---
           if [ ! -f docker-compose.yml ]; then
             cat > docker-compose.yml <<DC
           services:
@@ -108,6 +105,8 @@ jobs:
                 - .env
               ports:
                 - "80:8080"
+              command: >
+                gunicorn -w 2 -k gthread -t 60 -b 0.0.0.0:8080 "app:create_app()"
               healthcheck:
                 test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
                 interval: 20s
@@ -116,7 +115,13 @@ jobs:
                 start_period: 20s
           DC
           else
+            # оновити тег образу
             sed -i "s|^\\(\\s*image:\\s*\\).*|\\1${IMAGE_NAME}:${IMAGE_TAG}|g" docker-compose.yml
+            # (опційно) гарантуємо правильну команду запуску
+            if ! grep -q 'app:create_app()' docker-compose.yml; then
+              yq -i '.services.web.command = "gunicorn -w 2 -k gthread -t 60 -b 0.0.0.0:8080 \"app:create_app()\""' docker-compose.yml || \
+              sed -i 's|command:.*|command: >\n      gunicorn -w 2 -k gthread -t 60 -b 0.0.0.0:8080 "app:create_app()"|g' docker-compose.yml
+            fi
           fi
 
           # --- login + pull + restart ---
@@ -125,7 +130,7 @@ jobs:
           sudo docker compose up -d
           sudo docker image prune -f
 
-          # --- простий healthcheck ---
+          # --- життєвий мінімум перевірки ---
           sleep 2
           curl -fsS http://localhost:8080/healthz || true
           EOF
