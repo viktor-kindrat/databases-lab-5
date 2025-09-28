@@ -1,4 +1,5 @@
 name: Deploy to EC2
+
 on:
   push:
     branches: [ main ]
@@ -8,32 +9,110 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write   # <-- обов’язково
+      packages: write
+
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Login to GHCR
+      - name: Login to GHCR (PAT)
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}   # <-- PAT, не GITHUB_TOKEN
+          password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Build and Push Docker image
+      - name: Build & Push image
         run: |
-          docker build -t ghcr.io/${{ github.repository }}:${{ github.sha }} .
-          docker push ghcr.io/${{ github.repository }}:${{ github.sha }}
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
 
-      - name: SSH to EC2 and Deploy
+      - name: Add EC2 to known_hosts
         env:
-          IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
-          echo "$KEY" > key.pem
-          chmod 600 key.pem
-          ssh -o StrictHostKeyChecking=no -i key.pem "$USER@$HOST" "
-            cd /opt/databases-lab-5 &&
-            sudo docker compose down &&
-            sudo docker compose pull web || true &&
-            sudo docker compose up -d --build
-          "
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+
+      - name: SSH to EC2 and deploy
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          IMAGE: ${{ env.IMAGE }}
+          # app/env
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          APP_PORT: 8080
+        run: |
+          echo "$EC2_SSH_KEY" > ec2.pem
+          chmod 600 ec2.pem
+
+          # sanity: не публікує секрети, але зупиняє ран, якщо порожні
+          [ -n "$EC2_HOST" ] || { echo "EC2_HOST is empty"; exit 1; }
+          [ -n "$EC2_USER" ] || { echo "EC2_USER is empty"; exit 1; }
+
+          ssh -o StrictHostKeyChecking=no -i ec2.pem "${EC2_USER}@${EC2_HOST}" 'bash -s' <<EOF
+          set -euo pipefail
+
+          # --- install docker/compose if needed ---
+          if ! command -v docker >/dev/null 2>&1; then
+            if command -v apt-get >/dev/null 2>&1; then
+              sudo apt-get update -y
+              sudo apt-get install -y docker.io docker-compose-plugin curl
+            else
+              sudo dnf -y install docker curl || true
+            fi
+            sudo systemctl enable --now docker
+          fi
+
+          sudo mkdir -p /opt/databases-lab-5
+          sudo chown -R \$USER:\$USER /opt/databases-lab-5
+          cd /opt/databases-lab-5
+
+          # --- .env для апки ---
+          cat > .env <<EENV
+          FLASK_ENV=production
+          APP_PORT=${APP_PORT}
+          SECRET_KEY=${SECRET_KEY}
+          DB_HOST=${DB_HOST}
+          DB_PORT=${DB_PORT}
+          DB_NAME=${DB_NAME}
+          DB_USER=${DB_USER}
+          DB_PASSWORD=${DB_PASSWORD}
+          SQLALCHEMY_DATABASE_URI=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
+          EENV
+
+          # --- compose, без override команд: запускається CMD з Dockerfile (python app.py) ---
+          cat > docker-compose.yml <<DC
+          services:
+            web:
+              image: ${IMAGE}
+              restart: unless-stopped
+              env_file:
+                - .env
+              ports:
+                - "80:8080"
+              healthcheck:
+                test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+                interval: 20s
+                timeout: 5s
+                retries: 5
+                start_period: 20s
+          DC
+
+          # --- pull & up ---
+          echo "${GHCR_TOKEN}" | sudo docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+          sudo docker pull "${IMAGE}"
+          sudo docker compose up -d
+          sudo docker image prune -f
+          EOF
