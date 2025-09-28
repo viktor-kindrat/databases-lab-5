@@ -33,7 +33,7 @@ def create_app(app_config: Dict[str, Any], additional_config: Dict[str, Any]) ->
     """
     _process_input_config(app_config, additional_config)
     app = Flask(__name__)
-    app.config["SECRET_KEY"] = secrets.token_hex(16)
+    app.config["SECRET_KEY"] = os.getenv(SECRET_KEY) or secrets.token_hex(16)
     app.config.update(app_config)
 
     _init_db(app)
@@ -106,13 +106,28 @@ def _init_db(app: Flask) -> None:
 
 def _process_input_config(app_config: Dict[str, Any], additional_config: Dict[str, Any]) -> None:
     """
-    Processes input configuration
-    :param app_config: Flask configuration
-    :param additional_config: additional configuration
+    Processes input configuration. Secrets must come from environment variables (.env), not YAML.
+    :param app_config: Flask configuration (may already include SQLALCHEMY_DATABASE_URI)
+    :param additional_config: deprecated, not used for secrets
     """
-    # Get root username and password
-    root_user = os.getenv(MYSQL_ROOT_USER, additional_config[MYSQL_ROOT_USER])
-    root_password = os.getenv(MYSQL_ROOT_PASSWORD, additional_config[MYSQL_ROOT_PASSWORD])
-    # Set root username and password in app_config
-    app_config[SQLALCHEMY_DATABASE_URI] = app_config[SQLALCHEMY_DATABASE_URI].format(root_user, root_password)
-    pass
+    # If a full SQLALCHEMY_DATABASE_URI is provided, keep it.
+    uri = app_config.get(SQLALCHEMY_DATABASE_URI) or os.getenv(SQLALCHEMY_DATABASE_URI)
+
+    # Otherwise, try to construct from individual env vars
+    if not uri:
+        user = os.getenv("DB_USER") or os.getenv(MYSQL_ROOT_USER)
+        password = os.getenv("DB_PASSWORD") or os.getenv(MYSQL_ROOT_PASSWORD)
+        host = os.getenv("DB_HOST", "localhost")
+        port = os.getenv("DB_PORT")
+        name = os.getenv("DB_NAME")
+        if user and password and name:
+            hostport = f"{host}:{port}" if port else host
+            dialect = os.getenv("DB_DIALECT", "mysql")
+            uri = f"{dialect}://{user}:{password}@{hostport}/{name}"
+
+    # As a final fallback (mostly for local dev), use sqlite file if not set
+    if not uri:
+        uri = "sqlite:///device_db.sqlite"
+
+    app_config[SQLALCHEMY_DATABASE_URI] = uri
+    # No return needed

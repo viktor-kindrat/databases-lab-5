@@ -16,7 +16,7 @@ MarkupSafe==3.0.2
 pycparser==2.22
 PyMySQL==1.1.1
 pytz==2024.2
-PyYAML==6.0.2
+python-dotenv==1.0.1
 referencing==0.35.1
 rpds-py==0.20.1
 SQLAlchemy==2.0.36
