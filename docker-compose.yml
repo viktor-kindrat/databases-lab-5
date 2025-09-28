@@ -1,12 +1,16 @@
-version: "3.8"
+version: "3.9"
 
 services:
   web:
-    image: ghcr.io/viktor-kindrat/databases-lab-5:${TAG:-latest}
+    build: .
+    container_name: databases-lab-5-web
+    restart: always
     env_file:
       - .env
     ports:
       - "80:8080"
-    restart: always
-    command: >
-      gunicorn -w 2 -k gthread -t 60 -b 0.0.0.0:8080 "app:create_app()"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
