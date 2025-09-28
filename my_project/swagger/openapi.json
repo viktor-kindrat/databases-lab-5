@@ -1,0 +1,198 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Pseudo-Sporify Backend API",
+    "version": "1.0.0",
+    "description": "Актуальна документація для поточного бекенду."
+  },
+  "servers": [
+    { "url": "/" }
+  ],
+  "paths": {
+    "/labels": {
+      "get": {
+        "summary": "Отримати всі лейбли",
+        "responses": {
+          "200": {
+            "description": "Список лейблів",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Label" } }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Створити лейбл",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/LabelCreate" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Створений лейбл",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Label" } } }
+          }
+        }
+      }
+    },
+    "/labels/{label_id}": {
+      "parameters": [ {"name": "label_id", "in": "path", "required": true, "schema": {"type": "integer"}} ],
+      "get": {
+        "summary": "Отримати лейбл за ID",
+        "responses": {
+          "200": { "description": "Лейбл", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Label"}}} },
+          "404": { "description": "Не знайдено" }
+        }
+      },
+      "put": {
+        "summary": "Оновити лейбл (повністю)",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LabelCreate"}}}},
+        "responses": {"200": {"description": "Оновлено", "content": {"text/plain": {"schema": {"type": "string"}}}}, "404": {"description": "Не знайдено"}}
+      },
+      "patch": {
+        "summary": "Часткове оновлення лейблу",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LabelPatch"}}}},
+        "responses": {"200": {"description": "Оновлено"}, "404": {"description": "Не знайдено"}}
+      },
+      "delete": {
+        "summary": "Видалити лейбл",
+        "responses": {"200": {"description": "Видалено", "content": {"text/plain": {"schema": {"type": "string"}}}}, "404": {"description": "Не знайдено"}}
+      }
+    },
+
+    "/compositors": {
+      "get": {
+        "summary": "Отримати всіх композиторів",
+        "responses": {"200": {"description": "Список композиторів", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Compositor"}}}}}}
+      },
+      "post": {
+        "summary": "Створити композитора",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CompositorCreate"}}}},
+        "responses": {"201": {"description": "Створено", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Compositor"}}}}}
+      }
+    },
+    "/compositors/{compositor_id}": {
+      "parameters": [ {"name": "compositor_id", "in": "path", "required": true, "schema": {"type": "integer"}} ],
+      "get": {"summary": "Отримати композитора за ID", "responses": {"200": {"description": "Компіозитор", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Compositor"}}}}, "404": {"description": "Не знайдено"}}},
+      "put": {"summary": "Оновити композитора (повністю)", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CompositorCreate"}}}}, "responses": {"200": {"description": "Оновлено"}, "404": {"description": "Не знайдено"}}},
+      "patch": {"summary": "Часткове оновлення композитора", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CompositorPatch"}}}}, "responses": {"200": {"description": "Оновлено"}, "404": {"description": "Не знайдено"}}},
+      "delete": {"summary": "Видалити композитора", "responses": {"200": {"description": "Видалено"}, "404": {"description": "Не знайдено"}}}
+    },
+    "/compositors/search": {
+      "get": {
+        "summary": "Пошук композитора за іменем",
+        "parameters": [{"name": "name", "in": "query", "required": true, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Знайдений композитор", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Compositor"}}}}, "400": {"description": "Відсутній параметр name"}, "404": {"description": "Не знайдено"}}
+      }
+    },
+    "/compositors/{compositor_id}/albums": {
+      "post": {
+        "summary": "Додати альбом до композитора",
+        "parameters": [ {"name": "compositor_id", "in": "path", "required": true, "schema": {"type": "integer"}} ],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "properties": {"album_id": {"type": "integer"}}, "required": ["album_id"]}}}},
+        "responses": {"201": {"description": "Додано", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Message"}}}}, "400": {"description": "Некоректні дані"}, "404": {"description": "Не знайдено"}}
+      }
+    },
+
+    "/albums": {
+      "get": {"summary": "Отримати всі альбоми", "responses": {"200": {"description": "Список альбомів", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Album"}}}}}}},
+      "post": {"summary": "Створити альбом", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AlbumCreate"}}}}, "responses": {"201": {"description": "Створено", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Album"}}}}}}
+    },
+    "/albums/latest": {
+      "get": {"summary": "Останній створений альбом", "responses": {"200": {"description": "Альбом", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Album"}}}}}}
+    },
+    "/albums/reserve-copy": {
+      "post": {"summary": "Зарезервувати копію (демо-процедура)", "responses": {"201": {"description": "ОК", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Message"}}}}}}
+    },
+    "/albums/{album_name}/add_compositor/{compositor_name}": {
+      "post": {
+        "summary": "Додати композитора до альбому (за іменами)",
+        "parameters": [
+          {"name": "album_name", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "compositor_name", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {"201": {"description": "Додано", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Message"}}}}}
+      }
+    },
+    "/albums/{album_id}": {
+      "parameters": [ {"name": "album_id", "in": "path", "required": true, "schema": {"type": "integer"}} ],
+      "get": {"summary": "Отримати альбом за ID", "responses": {"200": {"description": "Альбом", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Album"}}}}, "404": {"description": "Не знайдено"}}},
+      "put": {"summary": "Оновити альбом (повністю)", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AlbumCreate"}}}}, "responses": {"200": {"description": "Оновлено", "content": {"text/plain": {"schema": {"type": "string"}}}}, "404": {"description": "Не знайдено"}}},
+      "patch": {"summary": "Часткове оновлення альбому", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AlbumPatch"}}}}, "responses": {"200": {"description": "Оновлено"}, "404": {"description": "Не знайдено"}}},
+      "delete": {"summary": "Видалити альбом", "responses": {"200": {"description": "Видалено", "content": {"text/plain": {"schema": {"type": "string"}}}}, "404": {"description": "Не знайдено"}}}
+    },
+    "/albums/search": {
+      "get": {"summary": "Пошук альбому за назвою", "parameters": [{"name": "name", "in": "query", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "Знайдений альбом", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Album"}}}}, "400": {"description": "Відсутній параметр name"}, "404": {"description": "Не знайдено"}}}
+    },
+
+    "/genres": {
+      "get": {"summary": "Отримати всі жанри", "responses": {"200": {"description": "Список жанрів", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Genre"}}}}}}},
+      "post": {"summary": "Створити жанр", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/GenreCreate"}}}}, "responses": {"201": {"description": "Створено", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Genre"}}}}}}
+    },
+    "/genres/{genre_id}": {
+      "parameters": [ {"name": "genre_id", "in": "path", "required": true, "schema": {"type": "integer"}} ],
+      "get": {"summary": "Отримати жанр за ID", "responses": {"200": {"description": "Жанр", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Genre"}}}}, "404": {"description": "Не знайдено"}}},
+      "put": {"summary": "Оновити жанр (повністю)", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/GenreCreate"}}}}, "responses": {"200": {"description": "Оновлено"}, "404": {"description": "Не знайдено"}}},
+      "patch": {"summary": "Часткове оновлення жанру", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/GenrePatch"}}}}, "responses": {"200": {"description": "Оновлено"}, "404": {"description": "Не знайдено"}}}
+    },
+    "/genres/create-noname": {
+      "post": {"summary": "Створити жанр(и) з ім'ям 'noname' (stored procedure)", "responses": {"201": {"description": "Створено", "content": {"text/plain": {"schema": {"type": "string"}}}}}}
+    },
+    "/genres/{compositor_id}": {
+      "delete": {"summary": "Видалити жанр (примітка: шлях використовує 'compositor_id' у коді)", "parameters": [{"name": "compositor_id", "in": "path", "required": true, "schema": {"type": "integer"}}], "responses": {"200": {"description": "Видалено"}, "404": {"description": "Не знайдено"}}}
+    }
+  },
+  "components": {
+    "schemas": {
+      "Message": {"type": "object", "properties": {"message": {"type": "string"}}},
+      "Error": {"type": "object", "properties": {"error": {"type": "string"}}},
+
+      "Label": {
+        "type": "object",
+        "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
+        "required": ["id", "name"]
+      },
+      "LabelCreate": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+      "LabelPatch": {"type": "object", "properties": {"name": {"type": "string"}}},
+
+      "SimpleAlbum": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}, "required": ["id", "name"]},
+      "SimpleCompositor": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}, "required": ["id", "name"]},
+
+      "Compositor": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "name": {"type": "string"},
+          "label_id": {"type": "integer", "nullable": true},
+          "label": {"type": "string"},
+          "albums": {"type": "array", "items": {"$ref": "#/components/schemas/SimpleAlbum"}}
+        },
+        "required": ["id", "name", "label", "albums"]
+      },
+      "CompositorCreate": {"type": "object", "properties": {"name": {"type": "string"}, "label_id": {"type": "integer"}}, "required": ["name"]},
+      "CompositorPatch": {"type": "object", "properties": {"name": {"type": "string"}, "label_id": {"type": "integer"}}},
+
+      "Album": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "name": {"type": "string"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "genre_id": {"type": "integer"},
+          "compositors": {"type": "array", "items": {"$ref": "#/components/schemas/SimpleCompositor"}}
+        },
+        "required": ["id", "name", "created_at", "genre_id", "compositors"]
+      },
+      "AlbumCreate": {"type": "object", "properties": {"name": {"type": "string"}, "created_at": {"type": "string", "format": "date-time"}, "genre_id": {"type": "integer"}}, "required": ["name", "created_at", "genre_id"]},
+      "AlbumPatch": {"type": "object", "properties": {"name": {"type": "string"}, "created_at": {"type": "string", "format": "date-time"}, "genre_id": {"type": "integer"}}},
+
+      "Genre": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "description": {"type": "string"}}, "required": ["id", "name", "description"]},
+      "GenreCreate": {"type": "object", "properties": {"name": {"type": "string"}, "description": {"type": "string"}}, "required": ["name", "description"]},
+      "GenrePatch": {"type": "object", "properties": {"name": {"type": "string"}, "description": {"type": "string"}}}
+    }
+  }
+}

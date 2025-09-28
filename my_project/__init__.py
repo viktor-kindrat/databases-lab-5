@@ -4,7 +4,6 @@ import secrets
 from typing import Dict, Any
 
 from flask import Flask
-from flask_restx import Api, Resource
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy_utils import database_exists, create_database
 
@@ -46,24 +45,46 @@ def create_app(app_config: Dict[str, Any], additional_config: Dict[str, Any]) ->
 
 
 def _init_swagger(app: Flask) -> None:
-    # A-lia Swagger
-    restx_api = Api(app, title='Pavelchak test backend',
-                    description='A simple backend')  # https://flask-restx.readthedocs.io/
+    """
+    Serve Swagger UI and OpenAPI spec for this backend.
+    """
+    from flask import send_from_directory
 
-    @restx_api.route('/number/<string:todo_id>')
-    class TodoSimple(Resource):
-        @staticmethod
-        def get(todo_id):
-            return todos, 202
+    swagger_dir = os.path.join(os.path.dirname(__file__), "swagger")
+    spec_filename = "openapi.json"
 
-        @staticmethod
-        def put(todo_id):
-            todos[todo_id] = todo_id
-            return todos, HTTPStatus.CREATED
+    @app.route("/swagger.json")
+    def swagger_json():
+        return send_from_directory(swagger_dir, spec_filename, mimetype="application/json")
 
-    @app.route("/hi")
-    def hello_world():
-        return todos, HTTPStatus.OK
+    @app.route("/docs")
+    def swagger_ui():
+        return (
+            """
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>
+window.onload = () => {
+  window.ui = SwaggerUIBundle({
+    url: '/swagger.json',
+    dom_id: '#swagger-ui'
+  });
+};
+</script>
+</body>
+</html>
+""",
+            HTTPStatus.OK,
+            {"Content-Type": "text/html; charset=utf-8"},
+        )
 
 
 def _init_db(app: Flask) -> None:
