@@ -1,0 +1,14 @@
+services:
+  web:
+    image: ghcr.io/OWNER/databases-lab-5:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env        # цей файл лежить на EC2 (НЕ в репо)
+    ports:
+      - "80:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
