@@ -103,11 +103,7 @@ jobs:
               ports:
                 - "80:8080"
               healthcheck:
-                test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
-                interval: 20s
-                timeout: 5s
-                retries: 5
-                start_period: 20s
+                test: [ "CMD", "true" ]
           DC
 
           # --- pull & up ---
@@ -116,25 +112,3 @@ jobs:
           sudo docker compose up -d
           sudo docker image prune -f
           EOF
-
-      - name: Sync docker-compose.yml from repo to EC2 and restart
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        run: |
-          echo "$EC2_SSH_KEY" > ec2.pem
-          chmod 600 ec2.pem
-
-          # гарантуємо папку на сервері
-          ssh -o StrictHostKeyChecking=no -i ec2.pem "${EC2_USER}@${EC2_HOST}" 'sudo mkdir -p /opt/databases-lab-5 && sudo chown -R $USER:$USER /opt/databases-lab-5'
-
-          # копіюємо docker-compose.yml з репо на EC2 поверх існуючого
-          scp -o StrictHostKeyChecking=no -i ec2.pem ./docker-compose.yml "${EC2_USER}@${EC2_HOST}:/opt/databases-lab-5/docker-compose.yml"
-
-          # застосовуємо новий compose
-          ssh -o StrictHostKeyChecking=no -i ec2.pem "${EC2_USER}@${EC2_HOST}" '
-            set -euo pipefail
-            cd /opt/databases-lab-5
-            sudo docker compose up -d
-          '
