@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Pseudo-Sporify Backend API",
+    "title": "Pseudo-Spotify Backend API",
     "version": "1.0.0",
     "description": "Актуальна документація для поточного бекенду. Актуально станом на 29.09"
   },
