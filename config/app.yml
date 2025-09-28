@@ -5,9 +5,7 @@ COMMON: &common
 development:
   <<: *common
   DEBUG: True
-#  SQLALCHEMY_DATABASE_URI: 'sqlite://'
-#  SQLALCHEMY_DATABASE_URI: 'sqlite:///device_db.sqlite'
-  SQLALCHEMY_DATABASE_URI: 'mysql://{0}:{1}@localhost/Spotify'
+  SQLALCHEMY_DATABASE_URI: 'sqlite:///device_db.sqlite'
 
 production:
   <<: *common

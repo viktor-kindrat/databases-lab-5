@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .general_dao import GeneralDAO
 from my_project.music.domain import Album
 from my_project.music.domain import Compositor
