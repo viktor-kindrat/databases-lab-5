@@ -1,14 +1,12 @@
+version: "3.8"
+
 services:
   web:
-    image: ghcr.io/OWNER/databases-lab-5:${IMAGE_TAG:-latest}
-    restart: unless-stopped
+    image: ghcr.io/viktor-kindrat/databases-lab-5:${TAG:-latest}
     env_file:
-      - .env        # цей файл лежить на EC2 (НЕ в репо)
+      - .env
     ports:
       - "80:8080"
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
-      interval: 20s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
+    restart: always
+    command: >
+      gunicorn -w 2 -k gthread -t 60 -b 0.0.0.0:8080 "app:create_app()"
