@@ -48,8 +48,8 @@ jobs:
         env:
           EC2_USER: ${{ secrets.EC2_USER }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          IMAGE_NAME: ghcr.io/${{ github.repository }}
+          IMAGE_TAG: ${{ github.sha }}
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_PORT: ${{ secrets.DB_PORT }}
           DB_NAME: ${{ secrets.DB_NAME }}
@@ -64,7 +64,7 @@ jobs:
 
           # --- docker & compose ---
           if ! command -v docker >/dev/null 2>&1; then
-            if command -v apt-get >/dev/null 2>&1; then
+            if command -v apt-get >/devалл 2>&1; then
               sudo apt-get update -y
               sudo apt-get install -y docker.io docker-compose-plugin curl
             else
@@ -84,17 +84,25 @@ jobs:
           sudo chown -R \$USER:\$USER /opt/databases-lab-5
           cd /opt/databases-lab-5
 
-          # --- .env (секрети з GitHub) ---
+          # --- .env: формуємо готовий URI для твого app.py ---
           cat > .env <<EENV
+          # базові
+          FLASK_ENV=production
+          APP_PORT=8080
+          SECRET_KEY=${SECRET_KEY}
+
+          # сирі параметри (на всяк випадок)
           DB_HOST=${DB_HOST}
           DB_PORT=${DB_PORT}
           DB_NAME=${DB_NAME}
           DB_USER=${DB_USER}
           DB_PASSWORD=${DB_PASSWORD}
-          SECRET_KEY=${SECRET_KEY}
+
+          # головне: повний URI для SQLAlchemy (твій app.py саме його читає)
+          SQLALCHEMY_DATABASE_URI=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
           EENV
 
-          # --- docker-compose.yml (створити або оновити) ---
+          # --- docker-compose.yml ---
           if [ ! -f docker-compose.yml ]; then
             cat > docker-compose.yml <<DC
           services:
@@ -105,8 +113,7 @@ jobs:
                 - .env
               ports:
                 - "80:8080"
-              command: >
-                gunicorn -w 2 -k gthread -t 60 -b 0.0.0.0:8080 "app:create_app()"
+              # без command: беремо CMD з Dockerfile -> "python app.py"
               healthcheck:
                 test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
                 interval: 20s
@@ -115,7 +122,6 @@ jobs:
                 start_period: 20s
           DC
           else
-            # оновити тег образу
             sed -i "s|^\\(\\s*image:\\s*\\).*|\\1${IMAGE_NAME}:${IMAGE_TAG}|g" docker-compose.yml
             # (опційно) гарантуємо правильну команду запуску
             if ! grep -q 'app:create_app()' docker-compose.yml; then
@@ -124,13 +130,14 @@ jobs:
             fi
           fi
 
-          # --- login + pull + restart ---
+          # --- deploy ---
           echo "${GHCR_TOKEN}" | sudo docker login ghcr.io -u "${GHCR_USER}" --password-stdin
           sudo docker pull "${IMAGE_NAME}:${IMAGE_TAG}"
           sudo docker compose up -d
           sudo docker image prune -f
 
-          # --- життєвий мінімум перевірки ---
+          # --- quick check ---
           sleep 2
           curl -fsS http://localhost:8080/healthz || true
           EOF
+      
