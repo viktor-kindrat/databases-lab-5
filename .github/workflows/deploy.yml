@@ -57,14 +57,12 @@ jobs:
           echo "$EC2_SSH_KEY" > ec2.pem
           chmod 600 ec2.pem
 
-          # sanity: не публікує секрети, але зупиняє ран, якщо порожні
           [ -n "$EC2_HOST" ] || { echo "EC2_HOST is empty"; exit 1; }
           [ -n "$EC2_USER" ] || { echo "EC2_USER is empty"; exit 1; }
 
           ssh -o StrictHostKeyChecking=no -i ec2.pem "${EC2_USER}@${EC2_HOST}" 'bash -s' <<EOF
           set -euo pipefail
 
-          # --- install docker/compose if needed ---
           if ! command -v docker >/dev/null 2>&1; then
             if command -v apt-get >/dev/null 2>&1; then
               sudo apt-get update -y
@@ -79,7 +77,6 @@ jobs:
           sudo chown -R \$USER:\$USER /opt/databases-lab-5
           cd /opt/databases-lab-5
 
-          # --- .env для апки ---
           cat > .env <<EENV
           FLASK_ENV=production
           APP_PORT=${APP_PORT}
@@ -92,7 +89,6 @@ jobs:
           SQLALCHEMY_DATABASE_URI=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
           EENV
 
-          # --- compose, без override команд: запускається CMD з Dockerfile (python app.py) ---
           cat > docker-compose.yml <<DC
           services:
             web:

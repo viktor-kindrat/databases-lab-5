@@ -1,9 +1,3 @@
-"""
-2022
-apavelchak@gmail.com
-© Andrii Pavelchak
-"""
-
 import os
 
 from waitress import serve
@@ -19,18 +13,15 @@ PRODUCTION = "production"
 FLASK_ENV = "FLASK_ENV"
 
 if __name__ == '__main__':
-    # Load environment variables from .env file if present
     load_dotenv()
 
     flask_env = os.environ.get(FLASK_ENV, DEVELOPMENT).lower()
 
-    # Base config from environment variables
     common_config = {
         "DEBUG": os.getenv("DEBUG", "False").lower() in ("1", "true", "yes"),
         "SQLALCHEMY_TRACK_MODIFICATIONS": False,
     }
 
-    # Prefer a full URI from env; otherwise fall back to sqlite in dev
     sqlalchemy_uri = os.getenv("SQLALCHEMY_DATABASE_URI")
     if not sqlalchemy_uri and flask_env == DEVELOPMENT:
         sqlalchemy_uri = "sqlite:///device_db.sqlite"
