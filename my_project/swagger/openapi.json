@@ -10,19 +10,6 @@
   ],
   "paths": {
     "/labels": {
-      "get": {
-        "summary": "Отримати всі лейбли",
-        "responses": {
-          "200": {
-            "description": "Список лейблів",
-            "content": {
-              "application/json": {
-                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Label" } }
-              }
-            }
-          }
-        }
-      },
       "post": {
         "summary": "Створити лейбл",
         "requestBody": {
